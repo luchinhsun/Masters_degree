@@ -5,8 +5,8 @@
 %          u_t = u_{xx} + u_{yy} + f(x,t)                              %
 %                                                                      %
 %    Test problme:                                                     %
-%      Exact solution: u(t,x,y) = exp(-t) sin(pi*x) sin(pi*y)          %
-%      Source term:  f(t,x,y) = exp(-t) sin(pi*x) sin(pi*y) (2pi^2-1)  %
+%      Exact solution: u(t,x,y) = exp(-2*t)*cos(pi*x)*cos(pi*y)        %
+%      Source term:  f(t,x,y) = exp(-2*t)cos(pi*x)cos(pi*y)(2*pi^2-2)  %
 %                                                                      %
 %    Files needed for the test:                                        %
 %                                                                      %
@@ -56,6 +56,7 @@ r=dt/(h1);
    for i=1:Np,
       for j=1:Np,
          V1(i,j) = uexact(t,x(i),y(j));
+         F(i,j) = fsource(V1(i,j),t,x(i),y(j));
       end
    end
    W=V1;
@@ -110,7 +111,8 @@ for k=1:k_t
 %                     b(i-1) = b(i-1); %+ u_exact(t,x(i+1),y(j))/h1;
 %                 end
             end
-            Vt = Ax\b;                          % Solve the diagonal matrix. 
+            %Vt = Ax\b;                          % Solve the diagonal matrix. 
+            Vt = tam(Ax,b);
             V2(1:Np,j) = Vt;
         end
     % Strang Splitting RK2 time-integration% Finish x-sweep.
@@ -119,19 +121,26 @@ for k=1:k_t
 
     %-------- RK2 for ODE ---------------------------
     for i=1:Np
-        V_tmp(i,1:Np)=V2(i,1:Np) + 1/2*dt*F(i,1:Np);
+        V_tmp(i,1:Np) = V2(i,1:Np) + 1/2*dt*F(i,1:Np);
         %---- compute m H J d f X Ca -----------------
-        W_tmp(i,1:Np)  = W(i,1:Np) + 1/2*dt*(-2*V2(i,1:Np));    
+%         W_tmp(i,1:Np)  = W(i,1:Np) + 1/2*dt*(-2*V2(i,1:Np));    
     end % finish RK2 stage1
+    
+   t = t+dt/2;
+   for i=1:Np,
+      for j=1:Np,
+         F(i,j) = fsource(V_tmp(i,j),t,x(i),y(j));
+      end
+   end
     
 %F=0;%(2*pi^2-2)*V_tmp;%-2*W_tmp;
    
     for i=1:Np
         V2(i,1:Np)=V2(i,1:Np) + dt*F(i,1:Np);
         %---- compute m H J d f X Ca -----------------
-        W(i,1:Np) = W(i,1:Np)  + dt*(-2*V_tmp(i,1:Np)); 
+%         W(i,1:Np) = W(i,1:Np)  + dt*(-2*V_tmp(i,1:Np)); 
     end % finish RK2
-
+    t = t+dt/2;
  
     %-------------- loop in y -direction -------------------------------- 
     
@@ -152,7 +161,8 @@ for k=1:k_t
 %                 b(j-1) = b(j-1);% + u_exact(t1,x(i),y(j+1))/h1;
 %             end
         end
-        ut = Ay\b;
+        %ut = Ay\b;
+        ut = tam(Ay,b);
          V1(i,1:Np) = ut';
     end
 
@@ -176,7 +186,11 @@ end  % Finished with the loop in time
   e = max(max(abs(V1-ue)))        % The infinity error.
 toc
 
+%mesh(V1)
     
-    
-    
-   
+az = load('V1.txt');
+max(max(abs(az-V1)))
+% ax = load('V2.txt');
+% max(max(abs(ax-V2)))
+% ac = load('V_tmp.txt');
+% max(max(abs(ac-V_tmp)))   
