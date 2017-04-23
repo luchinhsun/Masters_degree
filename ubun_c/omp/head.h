@@ -5,13 +5,15 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <math.h>
+#include <sys/timeb.h>
+#include <omp.h>
 
 #define a_c 0.0
 #define b_c 2.0
 #define c_c 0.0
 #define d_c 2.0
 #define tfinal 0.5
-#define N 80
+#define N 3000
 #define M N
 #define Mp (M+1)
 #define Np (N+1)

@@ -23,6 +23,8 @@ extern int k_t;
 
 extern float *Ax, *Ay, *V1, *V2, *W, *F, *V_tmp, *W_tmp, *ue;
 extern float *b, *x, *y, *ut, *Vt;
+//extern float *a_tam, *b_tam, *c_tam;
+//extern float *c_new_tam, *d_new_tam;
 
 int main(){
 
@@ -33,11 +35,21 @@ int main(){
 
 	float t = 0.0;
 
+	struct timeb start, end;
+	int diff;
+
+	omp_set_num_threads(4);
+
+	ftime(&start);
+	#pragma omp parallel private(i,j,k)
+	{
+
 	//---------- Big loop for time t --------------------------------------
 	for(k=0;k<k_t;k++){
 
 		//--- sweep in x-direction --------------------------------------
 		for(j=0;j<Np;j++){
+			#pragma omp for
 			for(i=0;i<Np;i++){
 				if(j==0){
 					b[i] = V1[i*Np+j] + r*(-V1[i*Np+j] + V1[i*Np+j+1]);
@@ -47,13 +59,20 @@ int main(){
 					b[i] = V1[i*Np+j] + (r/2)*(V1[i*Np+j-1] - 2*V1[i*Np+j] + V1[i*Np+j+1]);
 				}
 			}
+			//#pragma omp barrier
+
 			tam(Ax, b, Vt, Np);
+
+			//#pragma omp barrier
+			#pragma omp for
 			for (i=0;i<Np;i++){
 				V2[i*Np+j] = Vt[i];
 			}
+
 		}
 
 		//-------- RK2 for ODE ---------------------------
+		#pragma omp for nowait
 		for(i=0;i<Np;i++){
 			for(j=0;j<Np;j++){
 				V_tmp[i*Np+j] = V2[i*Np+j] + (1.0/2.0)*dt*F[i*Np+j];
@@ -61,10 +80,14 @@ int main(){
 			}
 		}
 
+		#pragma omp single
+		{
 		t = t+dt/2;
+		}
 
 		fsource(V_tmp, t, x, y, F);
 
+		#pragma omp for nowait
 		for(i=0;i<Np;i++){
 			for(j=0;j<Np;j++){
 				V2[i*Np+j] = V2[i*Np+j] + dt*F[i*Np+j];
@@ -72,10 +95,14 @@ int main(){
 			}
 		}
 
+		#pragma omp single
+                {
 		t = t+dt/2;
+		}
 
 		//-------------- loop in y -direction --------------------------------
 		for(i=0;i<Np;i++){
+			#pragma omp for
 			for(j=0;j<Np;j++){
 				if(i==0){
 					b[j] = V2[i*Np+j] + (r/2)*(-2*V2[i*Np+j] + 2*V2[(i+1)*Np+j]);
@@ -85,13 +112,24 @@ int main(){
 					b[j] = V2[i*Np+j] + (r/2)*(V2[(i-1)*Np+j] - 2*V2[i*Np+j] + V2[(i+1)*Np+j]);
 				}
 			}
+			//#pragma omp barrier
+
 			tam(Ay, b, ut, Np);
+
+			#pragma omp for
 			for (j=0;j<Np;j++){
 				V1[i*Np+j] = ut[j];
 			}
 		}
-	}
 
+	}
+	}// this is owned by parallel
+	ftime(&end);
+        diff = (int)(1000.0*(end.time-start.time)+(end.millitm-start.millitm));
+        printf("\nTime = %d ms\n", diff);
+
+
+	//-------------- check error between exact solution  --------------------------------
 	for(i=0;i<Np;i++){
 		for(j=0;j<Np;j++){
 			ue[i*Np+j] = exp(-2.0*tfinal)*cos(M_PI*x[i])*cos(M_PI*y[j]);
@@ -105,7 +143,7 @@ int main(){
 
 	printf("\nerr = %g\n", e);
 
-	Save_Result();
+	//Save_Result();
 	Free();
 
 	printf("complete\n\n");
